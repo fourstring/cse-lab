@@ -1,0 +1,8 @@
+cmake-build-debug/
+CMakeLists.txt
+*.d
+*.o
+*.log
+part1_tester
+yfs_client
+.idea/

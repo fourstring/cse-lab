@@ -11,3 +11,4 @@ $UMOUNT $YFSDIR1
 killall extent_server
 killall yfs_client
 killall lock_server
+killall gdbserver

@@ -1,0 +1,12 @@
+version: "3"
+services:
+  lab:
+    build: ./img
+    ports:
+      - 6666:6666
+    volumes:
+      - '.:/home/stu/devlop'
+    cap_add:
+      - ALL
+    privileged: true
+    working_dir: '/home/stu/devlop'
