@@ -89,9 +89,9 @@ endif
 
 lock_server : $(patsubst %.cc,%.o,$(lock_server)) rpc/librpc.a
 
-part1_tester=part1_tester.cc extent_client.cc extent_server.cc inode_manager.cc
+part1_tester=part1_tester.cc extent_client.cc extent_server.cc Directory.cc inode_manager.cc
 part1_tester : $(patsubst %.cc,%.o,$(part1_tester))
-yfs_client=yfs_client.cc extent_client.cc fuse.cc extent_server.cc inode_manager.cc
+yfs_client=yfs_client.cc extent_client.cc fuse.cc extent_server.cc Directory.cc inode_manager.cc
 ifeq ($(LAB3GE),1)
   yfs_client += lock_client.cc
 endif

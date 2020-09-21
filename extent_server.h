@@ -7,6 +7,7 @@
 #include <map>
 #include "extent_protocol.h"
 #include "inode_manager.h"
+#include "Directory.h"
 
 class extent_server {
  protected:
@@ -27,6 +28,7 @@ class extent_server {
   int get(extent_protocol::extentid_t id, std::string &);
   int getattr(extent_protocol::extentid_t id, extent_protocol::attr &);
   int remove(extent_protocol::extentid_t id, int &);
+  Directory get_dir(extent_protocol::extentid_t id);
 };
 
 #endif 

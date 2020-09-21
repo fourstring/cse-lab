@@ -1,1 +1,1 @@
-gdbserver 0.0.0.0:6666 ./part1_tester
+make && gdbserver 0.0.0.0:6666 ./part1_tester
