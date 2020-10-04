@@ -127,3 +127,8 @@ std::map<std::string, uint32_t>::const_iterator Directory::cbegin() {
 std::map<std::string, uint32_t>::const_iterator Directory::cend() {
     return filenames.cend();
 }
+
+Directory::Directory(Directory &&rhs) noexcept
+        : inum{rhs.inum}, im{rhs.im}, change_counter{rhs.change_counter}, filenames{std::move(rhs.filenames)} {
+    rhs.im = nullptr;
+}

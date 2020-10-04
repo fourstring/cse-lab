@@ -53,4 +53,23 @@ Directory extent_client::get_dir(extent_protocol::extentid_t eid) {
     return es->get_dir(eid);
 }
 
+extent_protocol::status
+extent_client::lookup(extent_protocol::extentid_t parent, const std::string &filename, bool &found, uint32_t &inum) {
+    return es->lookup(parent, filename, found, inum);
+}
+
+extent_protocol::status
+extent_client::create_file(extent_protocol::extentid_t parent, const std::string &filename, uint32_t type,
+                           uint32_t &new_inum) {
+    return es->create_file(parent, filename, type, new_inum);
+}
+
+extent_protocol::status extent_client::unlink(extent_protocol::extentid_t parent, const std::string &link_name) {
+    return es->unlink(parent, link_name);
+}
+
+extent_protocol::status extent_client::readdir(extent_protocol::extentid_t id, std::list<extent_dirent> &entries) {
+    return es->readdir(id, entries);
+}
+
 

@@ -76,3 +76,37 @@ Directory extent_server::get_dir(extent_protocol::extentid_t id) {
     return Directory{im, static_cast<uint32_t>(id)};
 }
 
+int
+extent_server::lookup(extent_protocol::extentid_t parent, const std::string &filename, bool &found, uint32_t &inum) {
+    auto dir = get_dir(parent);
+    auto file_inum = dir.filename_to_inum(filename);
+    if (file_inum != 0) {
+        found = true;
+        inum = file_inum;
+    } else {
+        found = false;
+    }
+    return extent_protocol::OK;
+}
+
+int extent_server::create_file(extent_protocol::extentid_t parent, const std::string &filename, uint32_t type,
+                               uint32_t &new_inum) {
+    auto dir = get_dir(parent);
+    new_inum = dir.create_file(filename, type);
+    return extent_protocol::OK;
+}
+
+int extent_server::unlink(extent_protocol::extentid_t parent, const std::string &link_name) {
+    auto dir = get_dir(parent);
+    dir.unlink(link_name);
+    return extent_protocol::OK;
+}
+
+int extent_server::readdir(extent_protocol::extentid_t id, std::list<extent_dirent> &entries) {
+    auto dir = get_dir(id);
+    for (auto entry = dir.cbegin(); entry != dir.cend(); entry++) {
+        entries.push_back({entry->first, entry->second});
+    }
+    return extent_protocol::OK;
+}
+

@@ -38,6 +38,8 @@ private:
     void record_change();
 
 public:
+    Directory(Directory&& rhs) noexcept ;
+
     Directory(inode_manager *im, uint32_t inum);
 
     uint32_t filename_to_inum(const std::string &filename);

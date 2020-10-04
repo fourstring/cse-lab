@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include "Directory.h"
 
+
 yfs_client::yfs_client() {
     ec = new extent_client();
 
@@ -92,7 +93,6 @@ yfs_client::issymlink(inum inum) {
     printf("isfile: %lld is not a symlink\n", inum);
     return false;
 }
-
 
 
 int
@@ -188,16 +188,15 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out) {
      * note: lookup is what you need to check if file exist;
      * after create file or dir, you must remember to modify the parent infomation.
      */
-    auto parent_dir = ec->get_dir(parent);
     auto found = false;
     auto ino = inum{0};
-    lookup(parent, name, found, ino);
+    ec->lookup(parent, name, found, reinterpret_cast<uint32_t &>(ino));
 
     if (found) {
         return EXIST;
     }
 
-    ino = parent_dir.create_file(name, extent_protocol::T_FILE);
+    ec->create_file(parent, name, extent_protocol::T_FILE, reinterpret_cast<uint32_t &>(ino));
 
     ino_out = ino;
     return r;
@@ -213,16 +212,15 @@ yfs_client::mkdir(inum parent, const char *name, mode_t mode, inum &ino_out) {
      * after create file or dir, you must remember to modify the parent infomation.
      */
 
-    auto parent_dir = ec->get_dir(parent);
     auto found = false;
     auto ino = inum{0};
-    lookup(parent, name, found, ino);
+    ec->lookup(parent, name, found, reinterpret_cast<uint32_t &>(ino));
 
     if (found) {
         return EXIST;
     }
 
-    ino = parent_dir.create_file(name, extent_protocol::T_DIR);
+    ec->create_file(parent, name, extent_protocol::T_DIR, reinterpret_cast<uint32_t &>(ino));
 
     ino_out = ino;
     return r;
@@ -237,7 +235,8 @@ yfs_client::lookup(inum parent, const char *name, bool &found, inum &ino_out) {
      * note: lookup file from parent dir according to name;
      * you should design the format of directory content.
      */
-    auto parent_dir = ec->get_dir(parent);
+    ec->lookup(parent, name, found, reinterpret_cast<uint32_t &>(ino_out));
+    /*auto parent_dir = ec->get_dir(parent);
     auto file_inum = parent_dir.filename_to_inum(name);
 
     if (file_inum != 0) {
@@ -246,7 +245,7 @@ yfs_client::lookup(inum parent, const char *name, bool &found, inum &ino_out) {
     } else {
         found = false;
         ino_out = 0;
-    }
+    }*/
 
     return r;
 }
@@ -260,9 +259,10 @@ yfs_client::readdir(inum dir, std::list<dirent> &list) {
      * note: you should parse the dirctory content using your defined format,
      * and push the dirents to the list.
      */
-    auto directory = ec->get_dir(dir);
-    for (auto entry = directory.cbegin(); entry != directory.cend(); entry++) {
-        list.push_back({entry->first, entry->second});
+    auto entries = std::list<extent_dirent>{};
+    ec->readdir(dir, entries);
+    for (const auto &ent:entries) {
+        list.push_back(dirent{ent.name, ent.inum});
     }
 
     return r;
@@ -329,8 +329,7 @@ int yfs_client::unlink(inum parent, const char *name) {
      * note: you should remove the file using ec->remove,
      * and update the parent directory content.
      */
-    auto parent_dir = ec->get_dir(parent);
-    parent_dir.unlink(name);
+    ec->unlink(parent, name);
 
     return r;
 }
@@ -338,16 +337,15 @@ int yfs_client::unlink(inum parent, const char *name) {
 int yfs_client::symlink(yfs_client::inum parent, const char *link, const char *name, inum &ino_out) {
     int r = OK;
 
-    auto parent_dir = ec->get_dir(parent);
     auto found = false;
     auto ino = inum{0};
-    lookup(parent, name, found, ino);
+    ec->lookup(parent, name, found, reinterpret_cast<uint32_t &>(ino));
 
     if (found) {
         return EXIST;
     }
 
-    ino = parent_dir.create_file(name, extent_protocol::T_SYMLINK);
+    ec->create_file(parent, name, extent_protocol::T_SYMLINK, reinterpret_cast<uint32_t &>(ino));
 
     ino_out = ino;
     auto size = strlen(link);

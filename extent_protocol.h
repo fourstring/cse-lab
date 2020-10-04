@@ -5,6 +5,12 @@
 
 #include "rpc.h"
 
+struct extent_dirent {
+    std::string name;
+    uint64_t inum;
+};
+
+
 class extent_protocol {
  public:
   typedef int status;
