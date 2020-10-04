@@ -8,11 +8,11 @@
 #include "extent_server.h"
 
 class extent_client {
-private:
-    extent_server *es;
+ private:
+  rpcc *cl;
 
-public:
-    extent_client();
+ public:
+  extent_client(std::string dst);
 
     extent_protocol::status create(uint32_t type, extent_protocol::extentid_t &eid);
 
@@ -39,5 +39,4 @@ public:
     Directory get_dir(extent_protocol::extentid_t eid);
 };
 
-#endif 
-
+#endif

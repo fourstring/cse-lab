@@ -2,7 +2,15 @@ cmake-build-debug/
 CMakeLists.txt
 *.d
 *.o
-*.log
 part1_tester
 yfs_client
+*.log
+foo.txt.yfs*
+tmprand
+yfs1/
+yfs2/
+.vscode/
+extent_server
+lock_server
+lock_tester
 .idea/

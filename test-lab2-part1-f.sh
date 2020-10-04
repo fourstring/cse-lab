@@ -14,15 +14,15 @@ DIR=$1
 # I'm just trying to be nice....
 #
 
-for times in {0..3}
+for times in {0..10}
 do
     echo "test Round:"$times""
-    if ( ! ( perl test-lab1-part2-b.pl $1 | grep -q -i "Passed all tests" ));
+    if ( ! ( perl test-lab2-part1-b.pl $1 | grep -q -i "Passed all tests" ));
     then
         echo "failed test B yfs1"
         exit
     fi
-    if ( ! ( perl test-lab1-part2-a.pl $1 | grep -q -i "Passed all tests" ));
+    if ( ! ( perl test-lab2-part1-a.pl $1 | grep -q -i "Passed all tests" ));
     then
         echo "failed test A yfs1"
         exit
