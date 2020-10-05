@@ -4,6 +4,9 @@ services:
     build: ./img
     ports:
       - 6666:6666
+      - 6667:6667
+      - 6668:6668
+      - 6669:6669
     volumes:
       - '.:/home/stu/devlop'
     cap_add:

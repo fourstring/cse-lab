@@ -21,7 +21,7 @@ int extent_server::create(uint32_t type, extent_protocol::extentid_t &id) {
     return extent_protocol::OK;
 }
 
-int extent_server::put(extent_protocol::extentid_t id, std::string buf, int &) {
+int extent_server::put(extent_protocol::extentid_t id, std::string &buf, int &) {
     id &= 0x7fffffff;
 
     const char *cbuf = buf.c_str();
@@ -77,26 +77,21 @@ Directory extent_server::get_dir(extent_protocol::extentid_t id) {
 }
 
 int
-extent_server::lookup(extent_protocol::extentid_t parent, const std::string &filename, bool &found, uint32_t &inum) {
+extent_server::lookup(extent_protocol::extentid_t parent, std::string &filename, uint32_t &inum) {
     auto dir = get_dir(parent);
     auto file_inum = dir.filename_to_inum(filename);
-    if (file_inum != 0) {
-        found = true;
-        inum = file_inum;
-    } else {
-        found = false;
-    }
+    inum = file_inum;
     return extent_protocol::OK;
 }
 
-int extent_server::create_file(extent_protocol::extentid_t parent, const std::string &filename, uint32_t type,
+int extent_server::create_file(extent_protocol::extentid_t parent, std::string &filename, uint32_t type,
                                uint32_t &new_inum) {
     auto dir = get_dir(parent);
     new_inum = dir.create_file(filename, type);
     return extent_protocol::OK;
 }
 
-int extent_server::unlink(extent_protocol::extentid_t parent, const std::string &link_name) {
+int extent_server::unlink(extent_protocol::extentid_t parent, std::string &link_name, int &void_ret) {
     auto dir = get_dir(parent);
     dir.unlink(link_name);
     return extent_protocol::OK;

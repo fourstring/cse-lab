@@ -8,11 +8,11 @@
 #include "extent_server.h"
 
 class extent_client {
- private:
-  rpcc *cl;
+private:
+    rpcc *cl;
 
- public:
-  extent_client(std::string dst);
+public:
+    extent_client(std::string dst);
 
     extent_protocol::status create(uint32_t type, extent_protocol::extentid_t &eid);
 
@@ -35,8 +35,6 @@ class extent_client {
     extent_protocol::status unlink(extent_protocol::extentid_t parent, const std::string &link_name);
 
     extent_protocol::status readdir(extent_protocol::extentid_t id, std::list<extent_dirent> &entries);
-
-    Directory get_dir(extent_protocol::extentid_t eid);
 };
 
 #endif

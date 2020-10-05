@@ -11,9 +11,9 @@
 
 
 class yfs_client {
-  extent_client *ec;
-  lock_client *lc;
- public:
+    extent_client *ec;
+    lock_client *lc;
+public:
 
     typedef unsigned long long inum;
     enum xxstatus {
@@ -42,8 +42,8 @@ private:
 
     static inum n2i(std::string);
 
- public:
-  yfs_client(std::string, std::string);
+public:
+    yfs_client(std::string, std::string);
 
     bool isfile(inum);
 

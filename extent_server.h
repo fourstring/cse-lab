@@ -28,7 +28,7 @@ public:
 
     int create(uint32_t type, extent_protocol::extentid_t &id);
 
-    int put(extent_protocol::extentid_t id, std::string, int &);
+    int put(extent_protocol::extentid_t id, std::string &buf, int &);
 
     int get(extent_protocol::extentid_t id, std::string &);
 
@@ -36,11 +36,11 @@ public:
 
     int remove(extent_protocol::extentid_t id, int &);
 
-    int lookup(extent_protocol::extentid_t parent, const std::string &filename, bool &found, uint32_t &inum);
+    int lookup(extent_protocol::extentid_t parent, std::string &filename, uint32_t &inum);
 
-    int create_file(extent_protocol::extentid_t parent, const std::string &filename, uint32_t type, uint32_t &new_inum);
+    int create_file(extent_protocol::extentid_t parent, std::string &filename, uint32_t type, uint32_t &new_inum);
 
-    int unlink(extent_protocol::extentid_t parent, const std::string &link_name);
+    int unlink(extent_protocol::extentid_t parent, std::string &link_name, int &void_ret);
 
     int readdir(extent_protocol::extentid_t id, std::list<extent_dirent> &entries);
 
