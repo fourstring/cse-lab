@@ -9,11 +9,10 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-yfs_client::yfs_client(std::string extent_dst, std::string lock_dst)
-{
+yfs_client::yfs_client(std::string extent_dst, std::string lock_dst) {
     ec = new extent_client(extent_dst);
     // Lab2: Use lock_client_cache when you test lock_cache
-    lc = new lock_client(lock_dst);
+    lc = new lock_client_cache(lock_dst);
     // lc = new lock_client_cache(lock_dst);
     if (ec->put(1, "") != extent_protocol::OK)
         printf("error init root dir\n"); // XYB: init root dir
@@ -37,7 +36,6 @@ yfs_client::filename(inum inum) {
 bool
 yfs_client::isfile(inum inum) {
     extent_protocol::attr a;
-
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         printf("error getting attr\n");
         return false;
@@ -98,11 +96,14 @@ yfs_client::getfile(inum inum, fileinfo &fin) {
 
     printf("getfile %016llx\n", inum);
     extent_protocol::attr a;
+    shared_guard sg{lc, inum};
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         r = IOERR;
         goto release;
     }
 
+
+    fin.type = a.type;
     fin.atime = a.atime;
     fin.mtime = a.mtime;
     fin.ctime = a.ctime;
@@ -151,6 +152,7 @@ yfs_client::setattr(inum ino, size_t size) {
      * according to the size (<, =, or >) content length.
      */
     extent_protocol::attr a;
+    exclusive_guard eg{lc, ino};
     if (ec->getattr(ino, a) != extent_protocol::OK) {
         return IOERR;
     }
@@ -172,7 +174,6 @@ yfs_client::setattr(inum ino, size_t size) {
         ec->get(ino, file_buf);
         ec->put(ino, file_buf);
     }
-
     return r;
 }
 
@@ -187,14 +188,15 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out) {
      */
     auto found = false;
     auto ino = inum{0};
+    exclusive_guard pg{lc, parent};
     ec->lookup(parent, name, found, reinterpret_cast<uint32_t &>(ino));
 
     if (found) {
         return EXIST;
     }
+    exclusive_guard fg{lc, ino};
 
     ec->create_file(parent, name, extent_protocol::T_FILE, reinterpret_cast<uint32_t &>(ino));
-
     ino_out = ino;
     return r;
 }
@@ -211,12 +213,14 @@ yfs_client::mkdir(inum parent, const char *name, mode_t mode, inum &ino_out) {
 
     auto found = false;
     auto ino = inum{0};
+    exclusive_guard pg{lc, parent};
     ec->lookup(parent, name, found, reinterpret_cast<uint32_t &>(ino));
 
     if (found) {
         return EXIST;
     }
 
+    exclusive_guard fg{lc, ino};
     ec->create_file(parent, name, extent_protocol::T_DIR, reinterpret_cast<uint32_t &>(ino));
 
     ino_out = ino;
@@ -224,7 +228,7 @@ yfs_client::mkdir(inum parent, const char *name, mode_t mode, inum &ino_out) {
 }
 
 int
-yfs_client::lookup(inum parent, const char *name, bool &found, inum &ino_out) {
+yfs_client::_lookup(inum parent, const char *name, bool &found, inum &ino_out) {
     int r = OK;
 
     /*
@@ -257,6 +261,7 @@ yfs_client::readdir(inum dir, std::list<dirent> &list) {
      * and push the dirents to the list.
      */
     auto entries = std::list<extent_dirent>{};
+    shared_guard sg{lc, dir};
     ec->readdir(dir, entries);
     for (const auto &ent:entries) {
         list.push_back(dirent{ent.name, ent.inum});
@@ -274,6 +279,7 @@ yfs_client::read(inum ino, size_t size, off_t off, std::string &data) {
      * note: read using ec->get().
      */
     extent_protocol::attr a;
+    shared_guard sg{lc, ino};
     ec->getattr(ino, a);
     if (a.type == 0) {
         return IOERR;
@@ -289,7 +295,6 @@ yfs_client::read(inum ino, size_t size, off_t off, std::string &data) {
 int
 yfs_client::write(inum ino, size_t size, off_t off, const char *data,
                   size_t &bytes_written) {
-    int r = OK;
 
     /*
      * your code goes here.
@@ -297,25 +302,9 @@ yfs_client::write(inum ino, size_t size, off_t off, const char *data,
      * when off > length of original file, fill the holes with '\0'.
      */
     extent_protocol::attr a;
-    ec->getattr(ino, a);
-    if (a.type == 0) {
-        return IOERR;
-    }
+    exclusive_guard eg{lc, ino};
 
-    bytes_written = 0;
-
-    auto least_new_size = (off + 1) + (size - 1);
-    auto buf = std::string{};
-    ec->get(ino, buf);
-    auto new_buf = std::string(least_new_size > a.size ? least_new_size : a.size, '\0');
-    std::copy(buf.begin(), buf.end(), new_buf.begin());
-    for (int i = 0; i < size; ++i) {
-        new_buf[off + i] = data[i];
-        bytes_written++;
-    }
-    ec->put(ino, new_buf);
-
-    return r;
+    return _write(ino, size, off, data, size);
 }
 
 int yfs_client::unlink(inum parent, const char *name) {
@@ -326,7 +315,16 @@ int yfs_client::unlink(inum parent, const char *name) {
      * note: you should remove the file using ec->remove,
      * and update the parent directory content.
      */
-    ec->unlink(parent, name);
+    auto found = false;
+    auto ino = inum{0};
+    exclusive_guard pg{lc, parent};
+    ec->lookup(parent, name, found, reinterpret_cast<uint32_t &>(ino));
+
+    if (!found) {
+        return NOENT;
+    }
+    exclusive_guard fg{lc, ino};
+    r = ec->unlink(parent, name);
 
     return r;
 }
@@ -336,17 +334,53 @@ int yfs_client::symlink(yfs_client::inum parent, const char *link, const char *n
 
     auto found = false;
     auto ino = inum{0};
+    exclusive_guard pg{lc, parent};
     ec->lookup(parent, name, found, reinterpret_cast<uint32_t &>(ino));
 
     if (found) {
         return EXIST;
     }
 
+    exclusive_guard fg{lc, ino};
     ec->create_file(parent, name, extent_protocol::T_SYMLINK, reinterpret_cast<uint32_t &>(ino));
 
     ino_out = ino;
     auto size = strlen(link);
-    r = write(ino, size, 0, link, size);
+    r = _write(ino, size, 0, link, size);
+    return r;
+}
+
+int yfs_client::lookup(yfs_client::inum parent, const char *name, bool &found, yfs_client::inum &ino_out) {
+    shared_guard sg{lc, parent};
+    auto ret = _lookup(parent, name, found, ino_out);
+    return ret;
+}
+
+int yfs_client::_write(yfs_client::inum ino, size_t size, off_t off, const char *data, size_t &bytes_written) {
+    int r;
+
+    extent_protocol::attr a;
+
+    ec->getattr(ino, a);
+    if (a.type == 0) {
+        return IOERR;
+    }
+
+    bytes_written = 0;
+
+    auto least_new_size = (off + 1) + (size - 1);
+    auto buf = std::string{};
+    r = ec->get(ino, buf);
+    if (r != OK) {
+        return r;
+    }
+    auto new_buf = std::string(least_new_size > a.size ? least_new_size : a.size, '\0');
+    std::copy(buf.begin(), buf.end(), new_buf.begin());
+    for (int i = 0; i < size; ++i) {
+        new_buf[off + i] = data[i];
+        bytes_written++;
+    }
+    r = ec->put(ino, new_buf);
     return r;
 }
 

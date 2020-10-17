@@ -44,44 +44,73 @@ getattr(yfs_client::inum inum, struct stat &st) {
     bzero(&st, sizeof(st));
 
     st.st_ino = inum;
-    printf("getattr %016llx %d\n", inum, yfs->isfile(inum));
-    if (yfs->isfile(inum)) {
-        yfs_client::fileinfo info;
-        ret = yfs->getfile(inum, info);
-        if (ret != yfs_client::OK)
-            return ret;
-        st.st_mode = S_IFREG | 0666;
-        st.st_nlink = 1;
-        st.st_atime = info.atime;
-        st.st_mtime = info.mtime;
-        st.st_ctime = info.ctime;
-        st.st_size = info.size;
-        printf("   getattr -> %llu\n", info.size);
-    } else if (yfs->isdir(inum)) {
-        yfs_client::dirinfo info;
-        ret = yfs->getdir(inum, info);
-        if (ret != yfs_client::OK)
-            return ret;
-        st.st_mode = S_IFDIR | 0777;
-        st.st_nlink = 2;
-        st.st_atime = info.atime;
-        st.st_mtime = info.mtime;
-        st.st_ctime = info.ctime;
-        printf("   getattr -> %lu %lu %lu\n", info.atime, info.mtime, info.ctime);
-    } else if (yfs->issymlink(inum)) {
-        yfs_client::fileinfo info;
-        ret = yfs->getfile(inum, info);
-        if (ret != yfs_client::OK)
-            return ret;
-        st.st_mode = S_IFLNK | 0777;
-        st.st_nlink = 1;
-        st.st_atime = info.atime;
-        st.st_mtime = info.mtime;
-        st.st_ctime = info.ctime;
-        st.st_size = info.size;
-        printf("   getattr -> %llu\n", info.size);
+    yfs_client::fileinfo info;
+    ret = yfs->getfile(inum, info);
+    if (ret != yfs_client::OK)
+        return ret;
+    switch (info.type) {
+        case extent_protocol::T_FILE:
+            st.st_mode = S_IFREG | 0666;
+            st.st_nlink = 1;
+            st.st_atime = info.atime;
+            st.st_mtime = info.mtime;
+            st.st_ctime = info.ctime;
+            st.st_size = info.size;
+            break;
+        case extent_protocol::T_DIR:
+            st.st_mode = S_IFDIR | 0777;
+            st.st_nlink = 2;
+            st.st_atime = info.atime;
+            st.st_mtime = info.mtime;
+            st.st_ctime = info.ctime;
+            break;
+        case extent_protocol::T_SYMLINK:
+            st.st_mode = S_IFLNK | 0777;
+            st.st_nlink = 1;
+            st.st_atime = info.atime;
+            st.st_mtime = info.mtime;
+            st.st_ctime = info.ctime;
+            st.st_size = info.size;
+            break;
     }
     return yfs_client::OK;
+//    if (yfs->isfile(inum)) {
+//        yfs_client::fileinfo info;
+//        ret = yfs->getfile(inum, info);
+//        if (ret != yfs_client::OK)
+//            return ret;
+//        st.st_mode = S_IFREG | 0666;
+//        st.st_nlink = 1;
+//        st.st_atime = info.atime;
+//        st.st_mtime = info.mtime;
+//        st.st_ctime = info.ctime;
+//        st.st_size = info.size;
+//        printf("   getattr -> %llu\n", info.size);
+//    } else if (yfs->isdir(inum)) {
+//        yfs_client::dirinfo info;
+//        ret = yfs->getdir(inum, info);
+//        if (ret != yfs_client::OK)
+//            return ret;
+//        st.st_mode = S_IFDIR | 0777;
+//        st.st_nlink = 2;
+//        st.st_atime = info.atime;
+//        st.st_mtime = info.mtime;
+//        st.st_ctime = info.ctime;
+//        printf("   getattr -> %lu %lu %lu\n", info.atime, info.mtime, info.ctime);
+//    } else if (yfs->issymlink(inum)) {
+//        yfs_client::fileinfo info;
+//        ret = yfs->getfile(inum, info);
+//        if (ret != yfs_client::OK)
+//            return ret;
+//        st.st_mode = S_IFLNK | 0777;
+//        st.st_nlink = 1;
+//        st.st_atime = info.atime;
+//        st.st_mtime = info.mtime;
+//        st.st_ctime = info.ctime;
+//        st.st_size = info.size;
+//        printf("   getattr -> %llu\n", info.size);
+//    }
+//    return yfs_client::OK;
 }
 
 //

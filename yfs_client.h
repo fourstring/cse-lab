@@ -22,6 +22,7 @@ public:
     typedef int status;
 
     struct fileinfo {
+        uint32_t type;
         unsigned long long size;
         unsigned long atime;
         unsigned long mtime;
@@ -55,7 +56,9 @@ public:
 
     int setattr(inum, size_t);
 
-    int lookup(inum, const char *, bool &, inum &);
+    int _lookup(inum parent, const char *name, bool &found, inum &ino_out);
+
+    int lookup(inum parent, const char *name, bool &found, inum &ino_out);
 
     int create(inum, const char *, mode_t, inum &);
 
@@ -63,7 +66,10 @@ public:
 
     int write(inum, size_t, off_t, const char *, size_t &);
 
-    int read(inum, size_t, off_t, std::string &);
+    int _write(inum ino, size_t size, off_t off, const char *data,
+               size_t &bytes_written);
+
+    int read(inum ino, size_t size, off_t off, std::string &data);
 
     int unlink(inum, const char *);
 

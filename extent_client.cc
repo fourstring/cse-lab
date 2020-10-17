@@ -86,7 +86,7 @@ extent_client::create_file(extent_protocol::extentid_t parent, const std::string
     extent_protocol::status ret = extent_protocol::OK;
     // Your lab2 part1 code goes here
     uint32_t inum_ret;
-    cl->call(extent_protocol::create_file, parent, filename, inum_ret);
+    cl->call(extent_protocol::create_file, parent, filename, type, inum_ret);
     new_inum = inum_ret;
     return ret;
 }
