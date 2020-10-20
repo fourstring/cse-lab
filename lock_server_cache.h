@@ -11,17 +11,14 @@
 #include <mutex>
 #include <memory>
 #include <queue>
+#include "concurrent_queue.h"
+#include <thread>
 
 enum class RLockStatus {
     Granted,
     Free,
     Revoking,
     Retrying
-};
-
-struct RLockState {
-    RLockStatus status;
-    std::string owned_handle;
 };
 
 
@@ -36,57 +33,29 @@ struct RevokeTask {
     RevokeTask(RevokeTask &rhs);
 };
 
-using lock_store_t = std::map<lock_protocol::lockid_t, RLockState>;
-using unique_t = std::unique_lock<std::mutex>;
+using thread_ptr = std::unique_ptr<std::thread>;
 
-template<typename T>
-class concurrent_queue {
-private:
-    std::queue<T> _queue{};
-    std::mutex update_mutex;
-    std::condition_variable wait_content_cv;
-public:
-    void enqueue(const T &data);
+struct RLockState {
+    RLockStatus status;
+    std::string owned_handle;
+    concurrent_queue<RevokeTask> revoke_queue;
+    bool _stop = false;
 
-    void enqueue(T &&data);
+    RLockState(RLockStatus status, const std::string &ownedHandle);
 
-    T dequeue();
+    RLockState(RLockState &&rhs) noexcept;
+
+    thread_ptr revoker{};
+
+    void revoke_handler();
+
+    void start();
+
+    void stop();
 };
 
-template<typename T>
-void concurrent_queue<T>::enqueue(const T &data) {
-    update_mutex.lock();
-    _queue.push(data);
-    if (_queue.size() == 1) {
-        update_mutex.unlock();
-        wait_content_cv.notify_one();
-    } else {
-        update_mutex.unlock();
-    }
-}
 
-template<typename T>
-T concurrent_queue<T>::dequeue() {
-    unique_t u{update_mutex};
-    while (_queue.empty()) {
-        wait_content_cv.wait(u);
-    }
-    auto v = _queue.front();
-    _queue.pop();
-    return v;
-}
-
-template<typename T>
-void concurrent_queue<T>::enqueue(T &&data) {
-    update_mutex.lock();
-    _queue.push(std::forward<T>(data));
-    if (_queue.size() == 1) {
-        update_mutex.unlock();
-        wait_content_cv.notify_one();
-    } else {
-        update_mutex.unlock();
-    }
-}
+using lock_store_t = std::map<lock_protocol::lockid_t, RLockState>;
 
 
 class lock_server_cache {

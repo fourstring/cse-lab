@@ -58,12 +58,13 @@ lock_client_cache::acquire(lock_protocol::lockid_t lid, LockKind kind = LockKind
                 istatus->second = RLockStatus::ToAcquire;
             }
         } else {
-            status.insert({lid, RLockStatus::None});
+            status.insert({lid, RLockStatus::ToAcquire});
             conditions[lid] = rcondition_ptr{new RLockCondition{}};
         }
     }
     // local has no lock, acquire from server
     int acquire_ret;
+    tprintf("%s: start fetching lock %lld from server\n", id.data(), lid)
     cl->call(lock_protocol::acquire, lid, id, acquire_ret);
     bool respond_retry = false;
     {
@@ -127,11 +128,12 @@ lock_client_cache::revoke_handler(lock_protocol::lockid_t lid,
                                   int &) {
     int ret = rlock_protocol::OK;
     // Your lab2 part3 code goes here
+    tprintf("%s: received revoke request for lock %lld\n", id.data(), lid)
     {
         unique_t u{update_mutex};
         auto &stat = status[lid];
         auto &condition = conditions[lid];
-        if (stat == RLockStatus::Locked || stat == RLockStatus::Acquiring) {
+        if (stat != RLockStatus::Free) {
             tprintf("%s: registered pending revoke for lock %lld\n", id.data(), lid)
             condition->pending_revoke = true;
             condition->revoke_response.wait(u);
@@ -149,19 +151,31 @@ lock_client_cache::retry_handler(lock_protocol::lockid_t lid,
                                  int &) {
     int ret = rlock_protocol::OK;
     // Your lab2 part3 code goes here
+    tprintf("%s: received retry request for lock %lld\n", id.data(), lid)
     {
         unique_t u{update_mutex};
         auto &stat = status[lid];
         auto &condition = conditions[lid];
-        if (stat == RLockStatus::Free || stat == RLockStatus::None) {
+        if (stat != RLockStatus::Acquiring) {
             tprintf("%s: registered pending retry for lock %lld\n", id.data(), lid)
             condition->pending_retry = true;
             condition->retry_response.wait(u);
-        }
-        if (stat == RLockStatus::Acquiring) {
+        } else if (stat == RLockStatus::Acquiring) {
             tprintf("%s: notified retry for acquiring lock %lld\n", id.data(), lid)
             condition->fetching_cv.notify_all();
         }
     }
     return ret;
+}
+
+void lock_client_cache::free_revoker() {
+    while (!_stop) {
+        auto lid = revoke_queue.dequeue();
+        {
+            unique_t u{update_mutex};
+            auto &stat = status[lid];
+            auto &condition = conditions[lid];
+
+        }
+    }
 }

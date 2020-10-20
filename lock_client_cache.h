@@ -13,6 +13,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <memory>
+#include "concurrent_queue.h"
 
 // Classes that inherit lock_release_user can override dorelease so that 
 // that they will be called when lock_client releases a lock.
@@ -48,7 +49,6 @@ private:
     using status_map_t = std::map<lock_protocol::lockid_t, RLockStatus>;
     using rcondition_ptr = std::unique_ptr<RLockCondition>;
     using conditions_map_t = std::map<lock_protocol::lockid_t, rcondition_ptr>;
-    using unique_t = std::unique_lock<std::mutex>;
 
     class lock_release_user *lu;
 
@@ -59,6 +59,8 @@ private:
     status_map_t status{};
     conditions_map_t conditions{};
     std::mutex update_mutex;
+    concurrent_queue<lock_protocol::lockid_t> revoke_queue;
+    bool _stop = false;
 public:
     static int last_port;
 
@@ -75,6 +77,8 @@ public:
 
     rlock_protocol::status retry_handler(lock_protocol::lockid_t,
                                          int &);
+
+    void free_revoker();
 };
 
 

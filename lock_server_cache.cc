@@ -20,7 +20,8 @@ int lock_server_cache::acquire(lock_protocol::lockid_t lid, std::string &id, int
     unique_t u{access_lock_mutex};
     auto istate = lock_store.find(lid);
     if (istate == lock_store.end()) {
-        lock_store.insert({lid, {RLockStatus::Granted, id}});
+        auto &new_state = lock_store.insert(std::make_pair(lid, RLockState{RLockStatus::Granted, id})).first->second;
+        new_state.start();
         result = lock_protocol::OK;
     } else {
         auto &state = istate->second;
@@ -28,7 +29,7 @@ int lock_server_cache::acquire(lock_protocol::lockid_t lid, std::string &id, int
             state.status = RLockStatus::Granted;
             result = lock_protocol::OK;
         } else {
-            revoke_queue.enqueue({lid, id});
+            state.revoke_queue.enqueue({lid, id});
             result = lock_protocol::RETRY;
         }
     }
@@ -83,3 +84,40 @@ RevokeTask::RevokeTask(RevokeTask &&rhs) noexcept: lid{rhs.lid},
 }
 
 RevokeTask::RevokeTask(RevokeTask &rhs) = default;
+
+RLockState::RLockState(RLockStatus status, const std::string &ownedHandle) :
+        status(status), owned_handle(ownedHandle), revoke_queue(), revoker(nullptr) {
+}
+
+RLockState::RLockState(RLockState &&rhs) noexcept:
+        owned_handle{std::move(rhs.owned_handle)}, status{rhs.status}, _stop{rhs._stop},
+        revoke_queue{std::move(rhs.revoke_queue)}, revoker{std::move(rhs.revoker)} {
+
+}
+
+void RLockState::revoke_handler() {
+    while (!_stop) {
+        RevokeTask task{revoke_queue.dequeue()};
+        handle h{owned_handle};
+        auto *cl = h.safebind();
+        if (cl) {
+            int void_r;
+            cl->call(rlock_protocol::revoke, task.lid, void_r);
+            handle req_h{task.requester_handle};
+            auto *req_cl = req_h.safebind();
+            if (req_cl) {
+                req_cl->call(rlock_protocol::retry, task.lid, void_r);
+                owned_handle = task.requester_handle;
+            }
+        }
+    }
+}
+
+void RLockState::start() {
+    revoker = thread_ptr{new std::thread{&RLockState::revoke_handler, this}};
+    revoker->detach();
+}
+
+void RLockState::stop() {
+    _stop = true;
+}
