@@ -8,6 +8,8 @@
 #include "extent_protocol.h" // TODO: delete it
 #include <memory>
 #include <vector>
+#include <mutex>
+#include "concurrent_queue.h"
 
 #define DISK_SIZE  1024*1024*16
 #define BLOCK_SIZE 512
@@ -54,6 +56,7 @@ private:
     bitmap_t blocks_bitmap;
     free_set_t free_blocks;
     uint32_t change_counters = 0;
+    std::mutex block_mutex{};
 
     void format_blocks();
 
@@ -118,6 +121,7 @@ typedef struct inode {
 class inode_manager {
 private:
     using blocks_level_t = std::pair<blockid_t, uint32_t>;
+    std::mutex inode_mutex{};
 
     block_manager *bm;
 

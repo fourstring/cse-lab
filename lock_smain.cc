@@ -31,7 +31,7 @@ main(int argc, char *argv[]) {
     //jsl_set_debug(2);
 
 // Lab2: uncomment this line when you begin to test lock_cache
-// #define USE_LOCK_CACHE
+#define USE_LOCK_CACHE
 #ifndef USE_LOCK_CACHE
     lock_server ls;
     rpcs server(atoi(argv[1]), count);

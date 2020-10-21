@@ -32,6 +32,7 @@ block_manager::alloc_block() {
      * note: you should mark the corresponding bit in block bitmap when alloc.
      * you need to think about which block you can start to be allocated.
      */
+    unique_t u{block_mutex};
     auto free_block_num = *free_blocks.begin();
     clear_block(free_block_num);
     blocks_bitmap[free_block_num] = BLOCK_USED;
@@ -50,6 +51,7 @@ block_manager::free_block(uint32_t id) {
      * your code goes here.
      * note: you should unmark the corresponding bit in the block bitmap when free.
      */
+    unique_t u{block_mutex};
     blocks_bitmap[id] = BLOCK_FREE;
     free_blocks.insert(id);
     change_counters++;
@@ -183,6 +185,7 @@ inode_manager::alloc_inode(uint32_t type) {
      * note: the normal inode block should begin from the 2nd inode block.
      * the 1st is used for root_dir, see inode_manager::inode_manager().
      */
+    unique_t u{inode_mutex};
     for (int cur_inode_num = 1; cur_inode_num < INODE_NUM; ++cur_inode_num) {
         auto inode = std::unique_ptr<inode_t>{get_inode(cur_inode_num)};
         if (inode->type == 0) {
@@ -203,6 +206,7 @@ inode_manager::free_inode(uint32_t inum) {
      * note: you need to check if the inode is already a freed one;
      * if not, clear it, and remember to write back to disk.
      */
+    unique_t u{inode_mutex};
     auto inode = std::unique_ptr<inode_t>{get_inode(inum)};
     if (inode->type == 0) {
         return;
