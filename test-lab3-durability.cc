@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
 		//cout << "r1:" << r1 << "_" << "r2:" << r2 << endl;
 		y.transaction_commit();
 
-		if (r1 == "50" && r2 == "250" && r3 == "fedcba9876543210FEDCBA9876543210") {
+		if (r1 == "100-50" && r2 == "200+50" && r3 == "fedcba9876543210FEDCBA9876543210") {
 			printf("Equal\n");
 		}
 		else {
@@ -43,10 +43,8 @@ int main(int argc, char **argv) {
 	y.transaction_begin();
 	string tmp1 = y.get("a");
 	string tmp2 = y.get("b");
-	int t1 = stoi(tmp1);
-	int t2 = stoi(tmp2);
-	y.set("a", to_string(t1-50));
-	y.set("b", to_string(t2+50));
+	y.set("a", tmp1+"-50");
+	y.set("b", tmp2+"+50");
 	y.transaction_commit();
 	
 	/*
