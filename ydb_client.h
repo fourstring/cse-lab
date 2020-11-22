@@ -10,7 +10,7 @@ class ydb_client {
 private:
 #define INVALID_TRANSID (-1)
 	rpcc *cl;
-	ydb_protocol::transaction_id currect_transaction;
+	ydb_protocol::transaction_id current_transaction;
 public:
 	ydb_client(const std::string &);
 	~ydb_client();
