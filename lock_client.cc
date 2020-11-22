@@ -31,10 +31,12 @@ lock_protocol::status
 lock_client::acquire(lock_protocol::lockid_t lid)
 {
 	// Your lab2 part2 code goes here
+	return lock_protocol::OK;
 }
 
 lock_protocol::status
 lock_client::release(lock_protocol::lockid_t lid)
 {
 	// Your lab2 part2 code goes here
+	return lock_protocol::OK;
 }
