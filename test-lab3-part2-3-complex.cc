@@ -7,6 +7,12 @@
 
 using namespace std;
 
+static std::string int_to_string(int i) {
+	char buf[16];
+	sprintf(buf, "%d", i);
+	return std::string(buf);
+}
+
 /*
 #define CHECK(express, errmsg) do { \
 	if (!(express)) { \
@@ -85,13 +91,13 @@ bool do_a_buy(ydb_client &y, int user, short *to_buy_product_count_list) {
 			success = true;
 			user_struct u;
 			y.transaction_begin();
-			string user_buf = y.get("user_"+to_string(user));
+			string user_buf = y.get("user_"+int_to_string(user));
 			memcpy(&u, user_buf.c_str(), sizeof(user_struct));
 			for(int i = 0; i < MAX_PRODUCT_KIND; i++) {
 				int to_buy_count = to_buy_product_count_list[i];
 				if (to_buy_count != 0) {
 					product_struct p;
-					string product_buf = y.get("product_"+to_string(i));
+					string product_buf = y.get("product_"+int_to_string(i));
 					memcpy(&p, product_buf.c_str(), sizeof(product_struct));    // check p.size() ?
 					if (!(p.count >= to_buy_count && u.money >= p.price*to_buy_count)) {
 						y.transaction_abort();
@@ -100,7 +106,7 @@ bool do_a_buy(ydb_client &y, int user, short *to_buy_product_count_list) {
 					}
 					p.count -= to_buy_count;
 					product_buf.assign(reinterpret_cast<char *>(&p), sizeof(product_struct));
-					y.set("product_"+to_string(i), product_buf);    // just set, because we can abort the transaction to recovery the origin value
+					y.set("product_"+int_to_string(i), product_buf);    // just set, because we can abort the transaction to recovery the origin value
 					u.money -= p.price*to_buy_count;
 					u.buyed_product_count_list[i] += to_buy_count;
 				}
@@ -109,7 +115,7 @@ bool do_a_buy(ydb_client &y, int user, short *to_buy_product_count_list) {
 				break;
 			}
 			user_buf.assign(reinterpret_cast<char *>(&u), sizeof(user_struct));
-			y.set("user_"+to_string(user), user_buf);
+			y.set("user_"+int_to_string(user), user_buf);
 			y.transaction_commit();
 			success = true;
 		} while(0);
@@ -126,14 +132,14 @@ void init_database(ydb_client &y) {
 		p.price = PRICE_OF_PRODUCT(i);    // 5 products, price is 1, 2, 3, 4, 5
 		p.count = INITIAL_PRODUCT_COUNT;    // initial count is 1000
 		string product_buf(reinterpret_cast<char *>(&p), sizeof(product_struct));
-		y.set("product_"+to_string(i), product_buf);
+		y.set("product_"+int_to_string(i), product_buf);
 	}
 	for(int i = 0; i < USER_COUNT; i++) {
 		user_struct u;
 		memset(&u, 0, sizeof(user_struct));
 		u.money = INITIAL_USER_MONEY;    // each user has 1000 money
 		string user_buf(reinterpret_cast<char *>(&u), sizeof(user_struct));
-		y.set("user_"+to_string(i), user_buf);
+		y.set("user_"+int_to_string(i), user_buf);
 	}
 	y.transaction_commit();
 }
@@ -209,12 +215,12 @@ bool check_final_state(ydb_client &y) {
 	y.transaction_begin();
 	for(int user = 0; user < USER_COUNT; user++) {
 		user_struct *u = &database_user_final_state[user];
-		string user_buf = y.get("user_"+to_string(user));
+		string user_buf = y.get("user_"+int_to_string(user));
 		memcpy(u, user_buf.c_str(), sizeof(user_struct));
 	}
 	for(int product = 0; product < MAX_PRODUCT_KIND; product++) {
 		product_struct *p = &database_product_final_state[product];
-		string product_buf = y.get("product_"+to_string(product));
+		string product_buf = y.get("product_"+int_to_string(product));
 		memcpy(p, product_buf.c_str(), sizeof(product_struct));
 	
 	}
