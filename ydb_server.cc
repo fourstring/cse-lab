@@ -3,15 +3,26 @@
 
 //#define DEBUG 1
 
+static long timestamp(void) {
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return (tv.tv_sec*1000 + tv.tv_usec/1000);
+}
+
 ydb_server::ydb_server(std::string extent_dst, std::string lock_dst) {
 	ec = new extent_client(extent_dst);
 	lc = new lock_client(lock_dst);
 	//lc = new lock_client_cache(lock_dst);
 
+	long starttime = timestamp();
+	
 	for(int i = 2; i < 1024; i++) {    // for simplicity, just pre alloc all the needed inodes
 		extent_protocol::extentid_t id;
 		ec->create(extent_protocol::T_FILE, id);
 	}
+	
+	long endtime = timestamp();
+	printf("time %ld ms\n", endtime-starttime);
 }
 
 ydb_server::~ydb_server() {
