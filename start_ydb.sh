@@ -14,5 +14,5 @@ fi
 ./lock_server 3772 >lock_server.log &
 sleep 1
 ./ydb_server $1 4772 2772 3772 >ydb_server.log &
-sleep 1
+sleep 2    # enlarge the waiting time
 
