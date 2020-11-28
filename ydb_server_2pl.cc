@@ -21,7 +21,7 @@ ydb_protocol::status ydb_server_2pl::transaction_begin(int,
     int _ = 0;
     ydb_protocol::transaction_id tid;
     ydb_server::transaction_begin(_, tid);
-    //tprintf("Transaction %d begin\n", tid)
+    tprintf("Transaction %d begin\n", tid)
     unique_t u{internal_state_mutex};
     {
         auto[e, ok] = transactions.try_emplace(tid);
@@ -47,14 +47,14 @@ ydb_protocol::status ydb_server_2pl::transaction_commit(ydb_protocol::transactio
         ec->put(key, value);
     }
     clean_transaction(id);
-    //tprintf("Transaction %d committed\n", id)
+    tprintf("Transaction %d committed\n", id)
     return ydb_protocol::OK;
 }
 
 ydb_protocol::status ydb_server_2pl::transaction_abort(ydb_protocol::transaction_id id, int &) {
     // lab3: your code here
     clean_transaction(id);
-    //tprintf("Transaction %d aborted\n", id)
+    tprintf("Transaction %d aborted\n", id)
     return ydb_protocol::OK;
 }
 
@@ -148,7 +148,7 @@ ydb_server_2pl::acquire_or_upgrade_lock(ydb_protocol::transaction_id tid, lock_p
     }
     rag[tid].insert(-lid);
 
-    //tprintf("Transaction %d requested %s lock %llu\n", tid, kind == AccessKind::Read ? "Read" : "Write", lid)
+    tprintf("Transaction %d requested %s lock %llu\n", tid, kind == AccessKind::Read ? "Read" : "Write", lid)
 
     if (iaccess == access_trace.end()) {
         if (kind == AccessKind::Read) {
@@ -156,7 +156,7 @@ ydb_server_2pl::acquire_or_upgrade_lock(ydb_protocol::transaction_id tid, lock_p
         } else {
             access_trace.try_emplace(lid, kind, readers_t{}, tid);
         }
-        //tprintf("Granted %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
+        tprintf("Granted %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
         rag_finalizer();
         return ydb_protocol::OK;
     }
@@ -173,20 +173,20 @@ ydb_server_2pl::acquire_or_upgrade_lock(ydb_protocol::transaction_id tid, lock_p
             access.set_writer(tid);
         }
         rag_finalizer();
-        //tprintf("Granted %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
+        tprintf("Granted %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
         return ydb_protocol::OK;
     }
     auto fail_to_upgrade = false;
     if (kind == AccessKind::Read && access.is_sharable(tid)) {
         access.readers.insert(tid);
         rag_finalizer();
-        //tprintf("Shared %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
+        tprintf("Shared %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
         return ydb_protocol::OK;
     }
     if (kind == AccessKind::Write && access.is_upgradable(tid)) {
         if (access.try_upgrade(tid)) {
             rag_finalizer();
-            //tprintf("Upgraded %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
+            tprintf("Upgraded %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
             return ydb_protocol::OK;
         } else {
             fail_to_upgrade = true;
@@ -195,9 +195,9 @@ ydb_server_2pl::acquire_or_upgrade_lock(ydb_protocol::transaction_id tid, lock_p
     // Necessary to avoid meaningless wait
     if (!fail_to_upgrade && deadlock_detect(tid)) {
         rag[tid].erase(-lid);
-        /*tprintf("Deadlock detected: trans %d try to get %s lock %llu\n", tid,
+        tprintf("Deadlock detected: trans %d try to get %s lock %llu\n", tid,
                 kind == AccessKind::Read ? "Read" : "Write",
-                lid)*/
+                lid)
         return ydb_protocol::ABORT;
     }
     // start waiting
@@ -205,9 +205,9 @@ ydb_server_2pl::acquire_or_upgrade_lock(ydb_protocol::transaction_id tid, lock_p
         // rag may change during waiting, must recheck
         if (deadlock_detect(tid)) {
             rag[tid].erase(-lid);
-            /*tprintf("Deadlock detected: trans %d try to get %s lock %llu\n", tid,
+            tprintf("Deadlock detected: trans %d try to get %s lock %llu\n", tid,
                     kind == AccessKind::Read ? "Read" : "Write",
-                    lid)*/
+                    lid)
             throw ydb_protocol::ABORT;
         }
         if (fail_to_upgrade) {
@@ -222,20 +222,21 @@ ydb_server_2pl::acquire_or_upgrade_lock(ydb_protocol::transaction_id tid, lock_p
 
     do {
         auto &waiter = waiters[lid];
-        /*tprintf("Transaction %d started to wait for %s lock %llu\n", tid, kind == AccessKind::Read ? "Read" : "Write",
-                lid)*/
+        tprintf("Transaction %d started to wait for %s lock %llu\n", tid, kind == AccessKind::Read ? "Read" : "Write",
+                lid)
         if (fail_to_upgrade) {
             waiter.wait_upgrade->wait(u);
         } else {
             if (kind == AccessKind::Read) {
                 waiter.wait_read->wait(u);
             } else {
-                waiter.wait_write->wait(u);
                 waiter.write_waiters.insert(tid);
+                tprintf("%llu has %lu waiters currently\n", lid, waiter.write_waiters.size())
+                waiter.wait_write->wait(u);
             }
         }
-        /*tprintf("Transaction %d awoke, for %s lock %llu\n", tid, kind == AccessKind::Read ? "Read" : "Write",
-                lid)*/
+        tprintf("Transaction %d awoke, for %s lock %llu\n", tid, kind == AccessKind::Read ? "Read" : "Write",
+                lid)
         try {
             if (try_lock()) {
                 if (kind == AccessKind::Write && !fail_to_upgrade) {
@@ -248,7 +249,7 @@ ydb_server_2pl::acquire_or_upgrade_lock(ydb_protocol::transaction_id tid, lock_p
         }
     } while (true);
     rag_finalizer();
-    //tprintf("Granted %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
+    tprintf("Granted %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
     return ydb_protocol::OK;
 }
 
@@ -256,7 +257,7 @@ ydb_protocol::status
 ydb_server_2pl::release_lock(ydb_protocol::transaction_id tid, lock_protocol::lockid_t lid, AccessKind kind) {
     unique_t u{internal_state_mutex};
     auto &access = access_trace[lid];
-    //tprintf("Released %s Lock %llu from trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
+    tprintf("Released %s Lock %llu from trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
     if (kind == AccessKind::Read) {
         access.remove_reader(tid);
     } else {
@@ -265,14 +266,14 @@ ydb_server_2pl::release_lock(ydb_protocol::transaction_id tid, lock_protocol::lo
     rag[-lid].erase(tid);
     auto &waiter = waiters[lid];
     if (access.can_upgrade_now()) {
-        //tprintf("Lock %llu will upgrade now\n", lid)
+        tprintf("Lock %llu will upgrade now\n", lid)
         waiter.wait_upgrade->notify_one();
         return ydb_protocol::OK;
     }
     if (access.is_free()) {
-        //tprintf("%s Lock %llu is free now\n", kind == AccessKind::Read ? "Read" : "Write", lid)
+        tprintf("%s Lock %llu is free now\n", kind == AccessKind::Read ? "Read" : "Write", lid)
         if (!waiter.write_waiters.empty()) {
-            waiter.wait_write->notify_one();
+            waiter.wait_write->notify_all();
         } else {
             waiter.wait_read->notify_all();
         }
@@ -341,6 +342,8 @@ bool ydb_server_2pl::deadlock_detect(ydb_protocol::transaction_id rid) {
 
 bool TransAccess::set_writer(ydb_protocol::transaction_id tid) {
     if (kind == AccessKind::Read && !readers.empty()) {
+        return false;
+    } else if (kind == AccessKind::Write && writer != 0) {
         return false;
     }
     kind = AccessKind::Write;
