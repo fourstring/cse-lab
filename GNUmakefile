@@ -6,7 +6,7 @@ LAB2GE=$(shell expr $(LAB) \>\= 2)
 LAB3GE=$(shell expr $(LAB) \>\= 3)
 LAB4GE=$(shell expr $(LAB) \>\= 4)
 #CXXFLAGS =  -g -MMD -Wall -I. -I$(RPC) -DLAB=$(LAB) -DSOL=$(SOL) -D_FILE_OFFSET_BITS=64 -no-pie -D_GLIBCXX_USE_CXX11_ABI=0
-CXXFLAGS =  -g -MMD -Wall -I. -I$(RPC) -DLAB=$(LAB) -DSOL=$(SOL) -D_FILE_OFFSET_BITS=64
+CXXFLAGS = -std=c++17 -g -MMD -Wall -I. -I$(RPC) -DLAB=$(LAB) -DSOL=$(SOL) -D_FILE_OFFSET_BITS=64
 FUSEFLAGS= -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=25 -I/usr/local/include/fuse -I/usr/include/fuse
 
 # choose librpc based on architecture
