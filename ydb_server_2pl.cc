@@ -61,7 +61,11 @@ ydb_protocol::status ydb_server_2pl::transaction_abort(ydb_protocol::transaction
 ydb_protocol::status
 ydb_server_2pl::get(ydb_protocol::transaction_id id, std::string &key, std::string &ret) {
     // lab3: your code here
-    auto &trans = transactions[id];
+    auto itrans = transactions.find(id);
+    if (itrans == transactions.end()) {
+        return ydb_protocol::TRANSIDINV;
+    }
+    auto &trans = itrans->second;
     auto lid = hasher(key) % 1024;
     //tprintf("Transaction %d start to get %s, hashed as %lu\n", id, key.data(), lid)
     if (acquire_or_upgrade_lock(id, lid, AccessKind::Read) == ydb_protocol::ABORT) {
@@ -90,7 +94,11 @@ ydb_server_2pl::get(ydb_protocol::transaction_id id, std::string &key, std::stri
 ydb_protocol::status
 ydb_server_2pl::set(ydb_protocol::transaction_id id, std::string &key, std::string &value, int &) {
     // lab3: your code here
-    auto &trans = transactions[id];
+    auto itrans = transactions.find(id);
+    if (itrans == transactions.end()) {
+        return ydb_protocol::TRANSIDINV;
+    }
+    auto &trans = itrans->second;
     auto lid = hasher(key) % 1024;
     //tprintf("Transaction %d start to set %s, hashed as %lu\n", id, key.data(), lid)
     if (acquire_or_upgrade_lock(id, lid, AccessKind::Write) == ydb_protocol::ABORT) {
@@ -137,10 +145,20 @@ ydb_server_2pl::acquire_or_upgrade_lock(ydb_protocol::transaction_id tid, lock_p
         waiters.try_emplace(lid);
     }
 
-    auto rag_finalizer = [&]() {
+    auto success_finalizer = [&]() {
         rag[tid].erase(-lid);
         rag[-lid].insert(tid);
-        transactions[tid].lock_set[lid] = kind;
+        auto &trans = transactions[tid];
+        auto iexisted_kind = trans.lock_set.find(lid);
+        if (iexisted_kind == trans.lock_set.end()) {
+            trans.lock_set[lid] = kind;
+        } else {
+            auto &existed_kind = iexisted_kind->second;
+            if (existed_kind == AccessKind::Read) {
+                existed_kind = kind;
+            }
+        }
+
     };
     // Add request in rag
     if (rag.find(-lid) == rag.end()) {
@@ -157,12 +175,12 @@ ydb_server_2pl::acquire_or_upgrade_lock(ydb_protocol::transaction_id tid, lock_p
             access_trace.try_emplace(lid, kind, readers_t{}, tid);
         }
         tprintf("Granted %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
-        rag_finalizer();
+        success_finalizer();
         return ydb_protocol::OK;
     }
     auto &access = access_trace[lid];
     if (access.has_access(tid, kind)) {
-        rag_finalizer();
+        success_finalizer();
         return ydb_protocol::OK;
     }
 
@@ -172,20 +190,20 @@ ydb_server_2pl::acquire_or_upgrade_lock(ydb_protocol::transaction_id tid, lock_p
         } else {
             access.set_writer(tid);
         }
-        rag_finalizer();
+        success_finalizer();
         tprintf("Granted %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
         return ydb_protocol::OK;
     }
     auto fail_to_upgrade = false;
     if (kind == AccessKind::Read && access.is_sharable(tid)) {
         access.readers.insert(tid);
-        rag_finalizer();
+        success_finalizer();
         tprintf("Shared %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
         return ydb_protocol::OK;
     }
     if (kind == AccessKind::Write && access.is_upgradable(tid)) {
         if (access.try_upgrade(tid)) {
-            rag_finalizer();
+            success_finalizer();
             tprintf("Upgraded %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
             return ydb_protocol::OK;
         } else {
@@ -248,7 +266,7 @@ ydb_server_2pl::acquire_or_upgrade_lock(ydb_protocol::transaction_id tid, lock_p
             return s;
         }
     } while (true);
-    rag_finalizer();
+    success_finalizer();
     tprintf("Granted %s Lock %llu to trans %d\n", kind == AccessKind::Read ? "Read" : "Write", lid, tid)
     return ydb_protocol::OK;
 }
@@ -385,10 +403,12 @@ bool TransAccess::try_upgrade(ydb_protocol::transaction_id tid) {
 }
 
 bool TransAccess::has_access(ydb_protocol::transaction_id tid, AccessKind kind) {
-    if (kind == this->kind) {
+    if (this->kind == AccessKind::Read) {
         if (kind == AccessKind::Read && readers.find(tid) != readers.end()) {
             return true;
-        } else if (kind == AccessKind::Write && writer == tid) {
+        }
+    } else {
+        if (writer == tid) {
             return true;
         }
     }

@@ -32,16 +32,11 @@ block_manager::alloc_block() {
      * note: you should mark the corresponding bit in block bitmap when alloc.
      * you need to think about which block you can start to be allocated.
      */
-    unique_t u{block_mutex};
     auto free_block_num = *free_blocks.begin();
     clear_block(free_block_num);
     blocks_bitmap[free_block_num] = BLOCK_USED;
     free_blocks.erase(free_block_num);
-    change_counters++;
-    if (change_counters == CHANGE_THRESHOLD) {
-        sync_bitmap(blocks_bitmap);
-        change_counters = 0;
-    }
+
     return free_block_num;
 }
 
@@ -51,14 +46,9 @@ block_manager::free_block(uint32_t id) {
      * your code goes here.
      * note: you should unmark the corresponding bit in the block bitmap when free.
      */
-    unique_t u{block_mutex};
     blocks_bitmap[id] = BLOCK_FREE;
     free_blocks.insert(id);
-    change_counters++;
-    if (change_counters == CHANGE_THRESHOLD) {
-        sync_bitmap(blocks_bitmap);
-        change_counters = 0;
-    }
+
 }
 
 // The layout of disk should be like this:
@@ -166,10 +156,17 @@ constexpr size_t block_manager::get_blocks_count(uint32_t bytes) {
     return (bytes + BLOCK_SIZE - 1) / BLOCK_SIZE;
 }
 
+block_manager::~block_manager() {
+    sync_bitmap(blocks_bitmap);
+}
+
 // inode layer -----------------------------------------
 
 inode_manager::inode_manager() {
     bm = new block_manager();
+    for (int i = 1; i < INODE_NUM; ++i) {
+        free_set.insert(i);
+    }
     auto root_inode = std::unique_ptr<inode>{get_inode(1)};
     if (root_inode->type != extent_protocol::T_DIR) {
         format_inodes();
@@ -185,17 +182,20 @@ inode_manager::alloc_inode(uint32_t type) {
      * note: the normal inode block should begin from the 2nd inode block.
      * the 1st is used for root_dir, see inode_manager::inode_manager().
      */
-    unique_t u{inode_mutex};
-    for (int cur_inode_num = 1; cur_inode_num < INODE_NUM; ++cur_inode_num) {
-        auto inode = std::unique_ptr<inode_t>{get_inode(cur_inode_num)};
-        if (inode->type == 0) {
-            inode->type = type;
-            inode->mtime = time(nullptr);
-            inode->ctime = time(nullptr);
-            put_inode(cur_inode_num, inode.get());
-            return cur_inode_num;
-        }
+    if (free_set.empty()) {
+        return 0;
     }
+    auto new_inode_num = *free_set.begin();
+    auto inode = std::unique_ptr<inode_t>{get_inode(new_inode_num)};
+    if (inode->type == 0) {
+        inode->type = type;
+        inode->mtime = time(nullptr);
+        inode->ctime = time(nullptr);
+        put_inode(new_inode_num, inode.get());
+        free_set.erase(free_set.begin());
+        return new_inode_num;
+    }
+
     return 0;
 }
 
@@ -206,7 +206,6 @@ inode_manager::free_inode(uint32_t inum) {
      * note: you need to check if the inode is already a freed one;
      * if not, clear it, and remember to write back to disk.
      */
-    unique_t u{inode_mutex};
     auto inode = std::unique_ptr<inode_t>{get_inode(inum)};
     if (inode->type == 0) {
         return;
@@ -214,6 +213,7 @@ inode_manager::free_inode(uint32_t inum) {
     // free blocks in delete_file
     std::memset(inode.get(), 0, sizeof(inode_t));
     put_inode(inum, inode.get());
+    free_set.insert(inum);
 }
 
 
@@ -224,10 +224,10 @@ inode_manager::get_inode(uint32_t inum) {
     struct inode *ino, *ino_disk;
     char buf[BLOCK_SIZE];
 
-    printf("\tim: get_inode %d\n", inum);
+    //printf("\tim: get_inode %d\n", inum);
 
     if (inum < 0 || inum >= INODE_NUM) {
-        printf("\tim: inum out of range\n");
+        //printf("\tim: inum out of range\n");
         return NULL;
     }
 
@@ -251,7 +251,7 @@ inode_manager::put_inode(uint32_t inum, struct inode *ino) {
     char buf[BLOCK_SIZE];
     struct inode *ino_disk;
 
-    printf("\tim: put_inode %d\n", inum);
+    //printf("\tim: put_inode %d\n", inum);
     if (ino == NULL)
         return;
 
@@ -263,7 +263,7 @@ inode_manager::put_inode(uint32_t inum, struct inode *ino) {
 
 #define MIN(a, b) ((a)<(b) ? (a) : (b))
 
-/* Get all the data of a file by inum. 
+/* Get all the data of a file by inum.
  * Return alloced data, should be freed by caller. */
 void
 inode_manager::read_file(uint32_t inum, char **buf_out, int *size) {
@@ -380,14 +380,16 @@ inode_manager::remove_file(uint32_t inum) {
 }
 
 void inode_manager::format_inodes() {
-    uint32_t root_dir = alloc_inode(extent_protocol::T_DIR);
-    if (root_dir != 1) {
-        printf("\tim: error! alloc first inode %d, should be 1\n", root_dir);
+    auto root_dir = std::unique_ptr<inode_t>{get_inode(1)};
+    if (root_dir->type != 0) {
+        //printf("\tim: error! alloc first inode %d, should be 1\n", root_dir);
         exit(0);
     }
-    auto new_inode = std::unique_ptr<inode>{new inode{}};
-    new_inode->type = extent_protocol::T_DIR;
-    put_inode(1, new_inode.get());
+    root_dir->type = extent_protocol::T_DIR;
+    root_dir->mtime = time(nullptr);
+    root_dir->ctime = time(nullptr);
+    put_inode(1, root_dir.get());
+    free_set.erase(free_set.find(1));
 }
 
 blockid_t inode_manager::inode_add_block(uint32_t inum) {

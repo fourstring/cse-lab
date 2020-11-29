@@ -81,7 +81,11 @@ ydb_protocol::status ydb_server_occ::transaction_abort(ydb_protocol::transaction
 
 ydb_protocol::status ydb_server_occ::get(ydb_protocol::transaction_id id, std::string &key, std::string &ret) {
     // lab3: your code here
-    auto &trans = transactions[id];
+    auto itrans = transactions.find(id);
+    if (itrans == transactions.end()) {
+        return ydb_protocol::TRANSIDINV;
+    }
+    auto &trans = itrans->second;
     auto lid = hasher(key) % 1024;
 //    tprintf("Transaction %d start to get %s, hashed as %lu\n", id, key.data(), lid)
     try {
@@ -110,7 +114,11 @@ ydb_protocol::status ydb_server_occ::get(ydb_protocol::transaction_id id, std::s
 
 ydb_protocol::status ydb_server_occ::set(ydb_protocol::transaction_id id, std::string &key, std::string &value, int &) {
     // lab3: your code here
-    auto &trans = transactions[id];
+    auto itrans = transactions.find(id);
+    if (itrans == transactions.end()) {
+        return ydb_protocol::TRANSIDINV;
+    }
+    auto &trans = itrans->second;
     auto lid = hasher(key) % 1024;
     //tprintf("Transaction %d start to set %s, hashed as %lu\n", id, key.data(), lid)
     trans.write_set[lid] = value;

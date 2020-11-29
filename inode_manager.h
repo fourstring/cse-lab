@@ -73,6 +73,8 @@ private:
 public:
     block_manager();
 
+    ~block_manager();
+
     struct superblock sb{};
 
     uint32_t alloc_block();
@@ -122,6 +124,7 @@ class inode_manager {
 private:
     using blocks_level_t = std::pair<blockid_t, uint32_t>;
     std::mutex inode_mutex{};
+    std::unordered_set<uint32_t> free_set;
 
     block_manager *bm;
 
